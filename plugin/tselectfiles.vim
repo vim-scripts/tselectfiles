@@ -1,20 +1,20 @@
 " tselectfile.vim -- A simplicistic files selector/browser (sort of)
-" @Author:      Thomas Link (mailto:micathom AT gmail com?subject=[vim])
+" @Author:      Thomas Link (micathom AT gmail com?subject=[vim])
 " @Website:     http://www.vim.org/account/profile.php?user_id=4037
 " @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 " @Created:     2007-04-16.
-" @Last Change: 2007-09-10.
-" @Revision:    0.4.453
+" @Last Change: 2008-10-01.
+" @Revision:    522
 " GetLatestVimScripts: 1865 1 tselectfiles.vim
 
 if &cp || exists("loaded_tselectfile")
     finish
 endif
-if !exists('loaded_tlib') || loaded_tlib < 13
-    echoerr "tlib >= 0.13 is required"
+if !exists('loaded_tlib') || loaded_tlib < 18
+    echoerr "tlib >= 0.18 is required"
     finish
 endif
-let loaded_tselectfile = 4
+let loaded_tselectfile = 6
 
 " Whether to cache directory listings (in memory). (per buffer, global)
 " If 0, disable the use of cached file listings all together.
@@ -27,46 +27,68 @@ TLet g:tselectfiles_no_cache_rx = ''
 " Retain only files matching this rx. (per window, per buffer, global)
 TLet g:tselectfiles_filter_rx = ''
 
+" The max depth when globbing directories recursively. 0 = no limit.
+TLet g:tselectfiles_limit = 0
+
+" A dictionary of REGEXP => FUNCREF(filename) -> String describing the 
+" file (DEFAULT: the filename).
+TLet g:tselectfiles_filedescription_rx = {}
+
 " Use these dirs (a comma separated list, see |globpath()|). (per window, per buffer, global)
 " TLet g:tselectfiles_dir = ''
 
-let s:select_files_files = {}
-
-function! s:SNR()
-    return matchstr(expand('<sfile>'), '<SNR>\d\+_\zeSNR$')
-endf
-
-function! s:SuffixesRx()
-    return printf('\(%s\)\$', join(map(split(&suffixes, ','), 'v:val'), '\|'))
-endf
-
-if !exists('g:tselectfiles_handlers')
-    " \ {'key': 35, 'agent': s:SNR() .'AgentSelect'},
-    let g:tselectfiles_handlers = [
-                \ {'key':  4, 'agent': s:SNR() .'AgentDeleteFile',      'key_name': '<c-d>', 'help': 'Delete file(s)'},
-                \ {'key': 18, 'agent': s:SNR() .'AgentReset'},
-                \ {'key': 19, 'agent': 'tlib#agent#EditFileInSplit',    'key_name': '<c-s>', 'help': 'Edit files (split)'},
-                \ {'key': 22, 'agent': 'tlib#agent#EditFileInVSplit',   'key_name': '<c-v>', 'help': 'Edit files (vertical split)'},
-                \ {'key': 20, 'agent': 'tlib#agent#EditFileInTab',      'key_name': '<c-t>', 'help': 'Edit files (new tab)'},
-                \ {'key': 23, 'agent': 'tlib#agent#ViewFile',           'key_name': '<c-w>', 'help': 'View file in window'},
-                \ {'key': 21, 'agent': s:SNR() .'AgentRenameFile',      'key_name': '<c-u>', 'help': 'Rename file(s)'},
-                \ {'key': 3,  'agent': 'tlib#agent#CopyItems',          'key_name': '<c-c>', 'help': 'Copy file name(s)'},
-                \ {'key': 11, 'agent': s:SNR() .'AgentCopyFile',        'key_name': '<c-k>', 'help': 'Copy file(s)'},
-                \ {'key': 16, 'agent': s:SNR() .'AgentPreviewFile',     'key_name': '<c-p>', 'help': 'Preview file'},
-                \ {'key':  2, 'agent': s:SNR() .'AgentBatchRenameFile', 'key_name': '<c-b>', 'help': 'Batch rename file(s)'},
-                \ {'key': 126, 'agent': s:SNR() .'AgentSelectBackups',  'key_name': '~',     'help': 'Select backup(s)'},
-                \ {'key': 9,  'agent': 'tlib#agent#ShowInfo',           'key_name': '<c-i>', 'help': 'Show info'},
-                \ {'key': 24, 'agent': s:SNR() .'AgentHide',            'key_name': '<c-x>', 'help': 'Hide some files'},
-                \ {'display_format': 'filename'},
-                \ {'return_agent': 'tlib#agent#ViewFile'},
-                \ {'pick_last_item': 0},
+TLet g:tselectfiles_world = {
+            \ 'type': 'm',
+            \ 'query': 'Select files',
+            \ 'scratch': '__ttoc__',
+            \ 'return_agent': 'tselectfiles#ViewFile',
+            \ 'display_format': 'tselectfiles#FormatEntry(world, %s)',
+            \ 'pick_last_item': 0,
+            \ 'key_handlers': [
+                \ {'key':  4,  'agent': 'tselectfiles#AgentDeleteFile',      'key_name': '<c-d>', 'help': 'Delete file(s)'},
+                \ {'key': 18,  'agent': 'tselectfiles#AgentReset'},
+                \ {'key': 19,  'agent': 'tlib#agent#EditFileInSplit',        'key_name': '<c-s>', 'help': 'Edit files (split)'},
+                \ {'key': 22,  'agent': 'tlib#agent#EditFileInVSplit',       'key_name': '<c-v>', 'help': 'Edit files (vertical split)'},
+                \ {'key': 20,  'agent': 'tlib#agent#EditFileInTab',          'key_name': '<c-t>', 'help': 'Edit files (new tab)'},
+                \ {'key': 23,  'agent': 'tselectfiles#ViewFile',             'key_name': '<c-w>', 'help': 'View file in window'},
+                \ {'key': 21,  'agent': 'tselectfiles#AgentRenameFile',      'key_name': '<c-u>', 'help': 'Rename file(s)'},
+                \ {'key': 3,   'agent': 'tlib#agent#CopyItems',              'key_name': '<c-c>', 'help': 'Copy file name(s)'},
+                \ {'key': 11,  'agent': 'tselectfiles#AgentCopyFile',        'key_name': '<c-k>', 'help': 'Copy file(s)'},
+                \ {'key': 16,  'agent': 'tselectfiles#AgentPreviewFile',     'key_name': '<c-p>', 'help': 'Preview file'},
+                \ {'key':  2,  'agent': 'tselectfiles#AgentBatchRenameFile', 'key_name': '<c-b>', 'help': 'Batch rename file(s)'},
+                \ {'key': 126, 'agent': 'tselectfiles#AgentSelectBackups',   'key_name': '~',     'help': 'Select backup(s)'},
+                \ {'key': 9,   'agent': 'tlib#agent#ShowInfo',               'key_name': '<c-i>', 'help': 'Show info'},
+                \ {'key': 24,  'agent': 'tselectfiles#AgentHide',            'key_name': '<c-x>', 'help': 'Hide some files'},
+                \ {'key':  7,  'agent': 'tselectfiles#Grep',                 'key_name': '<c-g>', 'help': 'Run vimgrep on selected files'},
+                \ {'key': 28,  'agent': 'tlib#agent#ToggleStickyList',       'key_name': '<c-\>', 'help': 'Toggle sticky'},
+            \ ],
+            \ }
+            " \ 'scratch_vertical': (&lines > &co),
                 \ ]
-                " \ {'key': 15, 'agent': s:SNR() .'AgentOpenDir',         'key_name': '<c-o>', 'help': 'Open dir'},
+
+TLet g:tselectfiles_suffixes = printf('\(%s\)\$', join(map(split(&suffixes, ','), 'v:val'), '\|'))
+
+TLet g:tselectfiles_hidden_rx = '\V\(/.\|/CVS\|/.attic\|.svn\|'. g:tselectfiles_suffixes .'\)\(\[\\/]\|\$\)'
+
+" " TBD: cwindow doesn't currently work as expected
+" TLet g:tselectfiles_show_quickfix_list = exists(':TRagcw') ? 'TRagcw' : 'cwindow'
+if exists(':TRagcw')
+    " The command that is run to show the quickfix list after running grep.
+    TLet g:tselectfiles_show_quickfix_list = 'TRagcw'
 endif
 
-if !exists('g:tselectfiles_hidden')
-    let g:tselectfiles_hidden_rx = '\V\(/.\|/CVS\|/.attic\|.svn\|'. s:SuffixesRx() .'\)\(\[\\/]\|\$\)'
-endif
+" TLet g:tselectfiles_dir_edit = 'TSelectFiles'
+" 
+" if !empty(g:tselectfiles_dir_edit)
+"     if exists('g:loaded_netrwPlugin')
+"         au! FileExplorer BufEnter
+"     endif
+"     augroup TSelectFiles
+"         autocmd!
+"         autocmd BufEnter * silent! if isdirectory(expand("<amatch>")) | exec g:tselectfiles_dir_edit .' '. expand("<amatch>") | endif
+"     augroup END
+" endif
+
 
 if !exists('g:tselectfiles_favourites')
     if has('win16') || has('win32') || has('win64')
@@ -84,309 +106,6 @@ if !exists('g:tselectfiles_favourites')
 endif
 
 
-function! s:CacheID() "{{{3
-    return s:select_files_dir . s:select_files_pattern
-endf
-
-
-function! s:PrepareSelectFiles(hide)
-    " TLogVAR a:hide
-    let filter = s:select_files_dir . s:select_files_pattern
-    " TLogVAR filter
-    let rv = split(globpath(s:select_files_dir, s:select_files_pattern), '\n')
-    " TLogVAR rv
-    if a:hide
-        call filter(rv, 'v:val !~ g:tselectfiles_hidden_rx')
-    endif
-    " let subset = tlib#var#Get('tselectfiles_filter_rx', 'wbg')
-    " if !empty(subset)
-    "     call filter(rv, 'v:val =~ subset')
-    " endif
-    if s:select_files_pattern == '**'
-        call sort(filter(rv, '!isdirectory(v:val)'))
-    else
-        call sort(map(rv, 'isdirectory(v:val) ? v:val."/" : v:val'))
-        let rv += g:tselectfiles_favourites
-        " call TLogDBG(string(split(s:select_files_dir, '[^\\]\zs,')))
-        for phf in split(s:select_files_dir, '[^\\]\zs,')
-            let ph = fnamemodify(phf, ':h')
-            " TLogVAR ph
-            " call TLogDBG(s:select_files_dir)
-            if ph != phf
-                if ph[-1] !~ '[\/]'
-                    let ph .= '/'
-                endif
-                call insert(rv, ph .'../')
-            endif
-        endfor
-    endif
-    return rv
-endf
-
-
-function! s:UseCache() "{{{3
-    let use_cache = tlib#var#Get('tselectfiles_use_cache', 'bg')
-    let no_cache  = tlib#var#Get('tselectfiles_no_cache_rx', 'bg')
-    let rv = use_cache && (empty(no_cache) || s:select_files_dir !~ no_cache)
-    " TLogVAR rv
-    return rv
-endf
-
-
-function! s:GetFileList(mode, hide)
-    if s:UseCache()
-        let id = s:CacheID()
-        if a:mode =~ '\(!\|\d\)$' || a:mode == 'scan' || !has_key(s:select_files_files, id)
-            if a:mode =~ '!$'
-                let s:select_files_files = {}
-            endif
-            " TLogVAR id
-            let s:select_files_files[id] = s:PrepareSelectFiles(a:hide)
-        endif
-        return s:select_files_files[id]
-    else
-        return s:PrepareSelectFiles(a:hide)
-    endif
-endf
-
-
-function! s:AgentPostprocess(world, result)
-    let item = resolve(a:result)
-    " TLogVAR item
-    " TLogDBG len(a:world.list)
-    if isdirectory(item)
-        let s:select_files_dir = fnamemodify(item, ':p')
-        return [s:ResetInputList(a:world, ''), '']
-    endif
-    return [a:world, a:result]
-endf
-
-
-function! s:AgentOpenDir(world, selected)
-    let dir = input('DIR: ', '', 'dir')
-    echo
-    if dir != ''
-        let s:select_files_dir = fnamemodify(dir, ':p')
-        return s:ResetInputList(a:world, '')
-    endif
-    return a:world
-endf
-
-
-" function! s:AgentSelect(world, selected) "{{{3
-"     let fname = a:world.GetBaseItem(a:world.prefidx)
-"     if !filereadable(fname) && s:UseCache()
-"         echom 'TSelectFile: Out-dated cache? File not readable: '. fname
-"         return s:ResetInputList(a:world)
-"     else
-"         call a:world.SelectItem('toggle', a:world.prefidx)
-"         " let a:world.state = 'display keepcursor'
-"         let a:world.state = 'redisplay'
-"         return a:world
-"     endif
-" endf
-
-
-function! s:AgentReset(world, selected) "{{{3
-    return s:ResetInputList(a:world)
-endf
-
-
-function! s:DeleteFile(file)
-    let doit = input('Really delete file "'. a:file .'"? (y/N) ', s:delete_this_file_default)
-    echo
-    if doit ==? 'y'
-        if doit ==# 'Y'
-            let s:delete_this_file_default = 'y'
-        endif
-        call delete(a:file)
-        echom 'Delete file: '. a:file
-        let bn = bufnr(a:file)
-        if bn != -1 && bufloaded(bn)
-            let doit = input('Delete corresponding buffer '. bn .' too? (y/N) ')
-            if doit ==? 'y'
-                exec 'bdelete '. bn
-            endif
-        endif
-    endif
-endf
-
-
-function! s:AgentDeleteFile(world, selected)
-    call a:world.CloseScratch()
-    let s:delete_this_file_default = ''
-    for file in a:selected
-        call s:DeleteFile(file)
-    endfor
-    return s:ResetInputList(a:world)
-endf
-
-
-function! s:Preview(file) "{{{3
-    exec 'pedit '. escape(a:file, '%#\ ')
-    let s:tselectfiles_previewedfile = a:file
-endf
-
-
-function! s:ClosePreview() "{{{3
-    if exists('s:tselectfiles_previewedfile')
-        pclose
-        unlet! s:tselectfiles_previewedfile
-    endif
-endf
-
-
-function! s:AgentPreviewFile(world, selected)
-    let file = a:selected[0]
-    if !exists('s:tselectfiles_previewedfile') || file != s:tselectfiles_previewedfile
-        call s:Preview(file)
-        let a:world.state = 'redisplay'
-    else
-        call s:ClosePreview()
-        let a:world.state = 'display'
-    endif
-    return a:world
-endf
-
-
-function! s:ConfirmCopyMove(query, src, dest)
-    echo
-    echo 'From: '. a:src
-    echo 'To:   '. a:dest
-    let ok = input(a:query .'(y/n) ', 'y')
-    echo
-    return ok[0] ==? 'y'
-endf
-
-
-function! s:CopyFile(src, dest, confirm)
-    if a:src != '' && a:dest != '' && (!a:confirm || s:ConfirmCopyMove('Copy now?', a:src, a:dest))
-        let fc = readfile(a:src, 'b')
-        if writefile(fc, a:dest, 'b') == 0
-            echom 'Copy file "'. a:src .'" -> "'. a:dest
-        else
-            echom 'Failed: Copy file "'. a:src .'" -> "'. a:dest
-        endif
-    endif
-endf
-
-
-function! s:AgentCopyFile(world, selected)
-    for file in a:selected
-        let name = input('Copy "'. file .'" to: ', file)
-        echo
-        call s:CopyFile(file, name, 0)
-    endfor
-    return s:ResetInputList(a:world)
-endf
-
-
-function! s:RenameFile(file, name, confirm)
-    if a:name != '' && (!a:confirm || s:ConfirmCopyMove('Rename now?', a:file, a:name))
-        call rename(a:file, a:name)
-        echom 'Rename file "'. a:file .'" -> "'. a:name
-        if bufloaded(a:file)
-            exec 'buffer! '. tlib#arg#Ex(a:file)
-            exec 'file! '. tlib#arg#Ex(a:name)
-            echom 'Rename buffer: '. a:file .' -> '. a:name
-        endif
-    endif
-endf
-
-
-function! s:AgentRenameFile(world, selected)
-    let s:rename_this_file_pattern = ''
-    let s:rename_this_file_subst   = ''
-    call a:world.CloseScratch()
-    for file in a:selected
-        let name = input('Rename "'. file .'" to: ', file)
-        echo
-        call s:RenameFile(file, name, 0)
-    endfor
-    return s:ResetInputList(a:world)
-endf
-
-function! s:AgentBatchRenameFile(world, selected)
-    let pattern = input('Rename pattern (whole path): ')
-    if pattern != ''
-        echo 'Pattern: '. pattern
-        let subst = input('Rename substitution: ')
-        if subst != ''
-            call a:world.CloseScratch()
-            for file in a:selected
-                let name = substitute(file, pattern, subst, 'g')
-                call s:RenameFile(file, name, 1)
-            endfor
-        endif
-    endif
-    echo
-    return s:ResetInputList(a:world)
-endf
-
-
-function! s:AgentSelectBackups(world, selected)
-    let a:world.filter = s:SuffixesRx()
-    let a:worldstate   = 'display'
-    return a:world
-endf
-
-
-function! s:ResetInputList(world, ...) "{{{3
-    let mode = a:0 >= 1 ? a:1 : 'scan'
-    let a:world.state  = 'reset'
-    let a:world.base   = s:GetFileList(mode, get(a:world, 'hide', 1))
-    let a:world.picked = 0
-    return a:world
-endf
-
-
-function! s:AgentHide(world, selected)
-    let hidden = get(a:world, 'hide', 1)
-    let a:world.hide = hidden ? 0 : 1
-    let a:world.state = 'reset'
-    return s:ResetInputList(a:world)
-endf
-
-
-function! TSelectFiles(mode, filter)
-    " TLogVAR a:mode, a:filter
-    let s:select_files_buffer = bufnr('%')
-    let s:select_files_mode   = a:mode
-    if empty(a:filter)
-        let s:select_files_dir = tlib#var#Get('tselectfiles_dir', 'bg', escape(expand('%:p:h'), ','))
-    else
-        let s:select_files_dir = escape(fnamemodify(a:filter, ':p:h'), ',')
-    endif
-    " call TLogVAR('s:select_files_dir=', s:select_files_dir)
-    let handlers = copy(g:tselectfiles_handlers)
-    let handlers += [
-                \ {'state': '\<reset\>', 'exec': 'let world.base = '. s:SNR().'GetFileList('. string(a:mode) .', 1)'},
-                \ ]
-                
-    let filter = tlib#var#Get('tselectfiles_filter_rx', 'wbg')
-    " TLogVAR filter
-    if !empty(filter)
-        call add(handlers, {'filter': filter})
-    endif
-    if a:mode =~ '^n'
-        let s:select_files_pattern = '*'
-        call add(handlers, {'postprocess': '', 'agent': s:SNR() .'AgentPostprocess'})
-    elseif a:mode =~ '^r'
-        let s:select_files_pattern = '**'
-    else
-        echoerr 'TSelectFile: Unknown mode: '. a:mode
-    endif
-    let fl = s:GetFileList(a:mode, 1)
-    " TLogVAR fl
-    " let s:select_files_files  = tlib#var#Get('tselect_files_files', 'b', {})
-    let fs = tlib#input#List('m', 'Select files', fl, handlers)
-    " let b:tselect_files_files = s:select_files_files
-    call s:ClosePreview()
-    " if !empty(fs)
-    "     call tlib#file#With('edit', 'buffer', fs)
-    " endif
-endf
-
 " :display: :TSelectFiles[!] [DIR]
 " Open/delete/rename files in the current directory.
 " A [!] forces the commands to rescan the directory. Otherwise a cached 
@@ -394,14 +113,14 @@ endf
 " You can also type <c-r> to force rescanning a directory, which could 
 " be necessary if the file system were changed (e.g. by creating a new 
 " file or by some external command)
-command! -bang -nargs=? -complete=dir TSelectFiles call TSelectFiles("normal<bang>".v:count, <q-args>)
+command! -bang -nargs=? -complete=dir TSelectFiles call tselectfiles#SelectFiles("normal<bang>".v:count, <q-args>)
 
 " Recursively show all files in the current directory and subdirectories 
 " (don't show favourites and ".."); don't use this command when you're 
 " at /.
 " A [!] forces the commands to rescan the directory. Otherwise a cached 
 " value will be used if available.
-command! -bang -nargs=? -complete=dir TSelectFilesInSubdirs call TSelectFiles("recursive<bang>".v:count, <q-args>)
+command! -bang -nargs=? -complete=dir TSelectFilesInSubdirs call tselectfiles#SelectFiles("recursive<bang>".v:count, <q-args>)
 
 
 finish
@@ -440,4 +159,23 @@ project-related files
 also be set per buffer.
 - Renamed some variables from tselectfile_* to tselectfiles_*.
 - Can be "suspended" (i.e. you can switch back to the orignal window)
+
+0.5
+- [wbg]:tselectfiles_filter_rx is used only when no directory is given 
+on the command line.
+- Require tlib >= 0.18
+- If the filename matches an entry in g:tselectfiles_filedescription_rx, 
+use the expression there to construct a file description (eg the file's 
+first line)
+- Option to run vimgrep on selected files.
+- tselectfiles#BaseFilter(): Set b:tselectfiles_filter_rx to something 
+useful.
+- tselectfiles#BaseFilter(): takes 2 optional arguments to substitute a 
+rx in the current buffer's filename.
+
+0.6
+- tselectfiles_filter_rx: Set as array
+- [gbw]tselectfiles_prefix: Remove prefix from filenames in list
+- [gbw]tselectfiles_limit variable
+- Problem when browsing single directories
 

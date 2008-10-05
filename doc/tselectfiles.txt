@@ -46,19 +46,24 @@ Suggested maps (to be set in ~/.vimrc): >
     noremap <m-f>       :TSelectFiles<cr>
 
 
-------------------------------------------------------------------------
+========================================================================
 Contents~
 
     plugin/tselectfiles.vim
-        g:tselectfiles_use_cache ..... |g:tselectfiles_use_cache|
-        g:tselectfiles_no_cache_rx ... |g:tselectfiles_no_cache_rx|
-        g:tselectfiles_filter_rx ..... |g:tselectfiles_filter_rx|
-        TSelectFiles ................. |TSelectFiles()|
-        :TSelectFiles ................ |:TSelectFiles|
-        :TSelectFilesInSubdirs ....... |:TSelectFilesInSubdirs|
+        g:tselectfiles_use_cache ............ |g:tselectfiles_use_cache|
+        g:tselectfiles_no_cache_rx .......... |g:tselectfiles_no_cache_rx|
+        g:tselectfiles_filter_rx ............ |g:tselectfiles_filter_rx|
+        g:tselectfiles_limit ................ |g:tselectfiles_limit|
+        g:tselectfiles_filedescription_rx ... |g:tselectfiles_filedescription_rx|
+        g:tselectfiles_world ................ |g:tselectfiles_world|
+        g:tselectfiles_suffixes ............. |g:tselectfiles_suffixes|
+        g:tselectfiles_hidden_rx ............ |g:tselectfiles_hidden_rx|
+        g:tselectfiles_show_quickfix_list ... |g:tselectfiles_show_quickfix_list|
+        :TSelectFiles ....................... |:TSelectFiles|
+        :TSelectFilesInSubdirs .............. |:TSelectFilesInSubdirs|
 
 
-------------------------------------------------------------------------
+========================================================================
 plugin/tselectfiles.vim~
 
                                                     *g:tselectfiles_use_cache*
@@ -75,8 +80,29 @@ g:tselectfiles_no_cache_rx     (default: '')
 g:tselectfiles_filter_rx       (default: '')
     Retain only files matching this rx. (per window, per buffer, global)
 
-                                                    *TSelectFiles()*
-TSelectFiles(mode, filter)
+                                                    *g:tselectfiles_limit*
+g:tselectfiles_limit           (default: 0)
+    The max depth when globbing directories recursively. 0 = no limit.
+
+                                                    *g:tselectfiles_filedescription_rx*
+g:tselectfiles_filedescription_rx (default: {})
+    A dictionary of REGEXP => FUNCREF(filename) -> String describing the 
+    file (DEFAULT: the filename).
+
+                                                    *g:tselectfiles_world*
+g:tselectfiles_world           (default: {)
+
+                                                    *g:tselectfiles_suffixes*
+g:tselectfiles_suffixes        (default: printf('\(%s\)\$', join(map(split(&suffixes, ','), 'v:val'), '\|')))
+
+                                                    *g:tselectfiles_hidden_rx*
+g:tselectfiles_hidden_rx       (default: '\V\(/.\|/CVS\|/.attic\|.svn\|'. g:tselectfiles_suffixes .'\)\(\[\\/]\|\$\)')
+
+                                                    *g:tselectfiles_show_quickfix_list*
+g:tselectfiles_show_quickfix_list (default: 'TRagcw')
+    " TBD: cwindow doesn't currently work as expected
+    TLet g:tselectfiles_show_quickfix_list = exists(':TRagcw') ? 'TRagcw' : 'cwindow'
+    The command that is run to show the quickfix list after running grep.
 
                                                     *:TSelectFiles*
 :TSelectFiles[!] [DIR]
@@ -96,3 +122,5 @@ TSelectFiles(mode, filter)
     value will be used if available.
 
 
+
+vim:tw=78:fo=tcq2:isk=!-~,^*,^|,^":ts=8:ft=help:norl:
