@@ -3,8 +3,8 @@
 " @Website:     http://www.vim.org/account/profile.php?user_id=4037
 " @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 " @Created:     2007-04-16.
-" @Last Change: 2008-10-01.
-" @Revision:    522
+" @Last Change: 2008-10-16.
+" @Revision:    544
 " GetLatestVimScripts: 1865 1 tselectfiles.vim
 
 if &cp || exists("loaded_tselectfile")
@@ -14,7 +14,7 @@ if !exists('loaded_tlib') || loaded_tlib < 18
     echoerr "tlib >= 0.18 is required"
     finish
 endif
-let loaded_tselectfile = 6
+let loaded_tselectfile = 7
 
 " Whether to cache directory listings (in memory). (per buffer, global)
 " If 0, disable the use of cached file listings all together.
@@ -26,6 +26,12 @@ TLet g:tselectfiles_no_cache_rx = ''
 
 " Retain only files matching this rx. (per window, per buffer, global)
 TLet g:tselectfiles_filter_rx = ''
+
+" In |tselectfiles#BaseFilter()|, rewrite name parts according to these 
+" rules.
+TLet g:tselectfiles_part_subst = {}
+" Poor man's singularize etc.
+TLet g:tselectfiles_part_subst_ruby = {'s$': '', '^\(controller\|test\|spec\)$': ''}
 
 " The max depth when globbing directories recursively. 0 = no limit.
 TLet g:tselectfiles_limit = 0
@@ -43,6 +49,7 @@ TLet g:tselectfiles_world = {
             \ 'scratch': '__ttoc__',
             \ 'return_agent': 'tselectfiles#ViewFile',
             \ 'display_format': 'tselectfiles#FormatEntry(world, %s)',
+            \ 'filter_format': 'tselectfiles#FormatFilter(world, %s)',
             \ 'pick_last_item': 0,
             \ 'key_handlers': [
                 \ {'key':  4,  'agent': 'tselectfiles#AgentDeleteFile',      'key_name': '<c-d>', 'help': 'Delete file(s)'},
@@ -178,4 +185,8 @@ rx in the current buffer's filename.
 - [gbw]tselectfiles_prefix: Remove prefix from filenames in list
 - [gbw]tselectfiles_limit variable
 - Problem when browsing single directories
+
+0.7
+- NEW: g:tselectfiles_part_subst* variables.
+- NEW: [bg]:tselectfiles_filter_basename variable
 

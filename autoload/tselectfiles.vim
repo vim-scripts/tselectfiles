@@ -3,8 +3,8 @@
 " @Website:     http://www.vim.org/account/profile.php?user_id=4037
 " @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 " @Created:     2007-10-15.
-" @Last Change: 2008-10-03.
-" @Revision:    0.0.179
+" @Last Change: 2008-10-16.
+" @Revision:    0.0.197
 
 if &cp || exists("loaded_tselectfiles_autoload")
     finish
@@ -350,7 +350,7 @@ function! tselectfiles#FormatVikiMetaDataOrFirstLine(filename) "{{{3
         let acc   = []
         let cont  = 0
         for l in lines
-            if cont || l =~ '^\(\*\|\s*#\(TI\|AU\|DATE\|VAR\)\)' || empty(acc)
+            if cont || l =~ '^\(\*\|\s*#\(TI\(TLE\)\?\|AU\(THOR\)\?\|DATE\|VAR\)\>\)' || empty(acc)
                 let cont = 0
                 if l =~ '\\$'
                     let l = substitute(l, '\\\s*$', '', '')
@@ -388,6 +388,16 @@ function! tselectfiles#FormatEntry(world, filename) "{{{3
     endfor
     " TLogVAR display_format
     return eval(call(function("printf"), a:world.FormatArgs(display_format, filename)))
+endf
+
+
+function! tselectfiles#FormatFilter(world, filename) "{{{3
+    let mode = tlib#var#Get('tselectfiles_filter_basename', 'bg', 0)
+    if mode
+        return fnamemodify(a:filename, ':t')
+    else
+        return a:filename
+    endif
 endf
 
 
@@ -451,7 +461,13 @@ function! tselectfiles#BaseFilter(...) "{{{3
         let rplc = a:0 >= 2 ? a:2 : ''
         let file = substitute(file, a:1, rplc, 'g')
     endif
-    let b:tselectfiles_filter_rx = join(split(file, '\A'), '\|')
+    let parts = split(file, '\A')
+    let subst = tlib#var#Get('tselectfiles_part_subst_'. &filetype, 'wbg', tlib#var#Get('tselectfiles_part_subst', 'wbg', {}))
+    for [pattern, substitution] in items(subst)
+        call map(parts, 'substitute(v:val, pattern, substitution, "g")')
+    endfor
+    call filter(parts, '!empty(v:val)')
+    let b:tselectfiles_filter_rx = join(parts, '\|')
     return b:tselectfiles_filter_rx
 endf
 

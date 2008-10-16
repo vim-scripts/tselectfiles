@@ -19,7 +19,8 @@ b:tselectfile_filter_rx = expand('%:t:r'). Thus, when I open
 :TSelectFiles shows all the files under "~/vimfiles" matching "foo".
 
 Features:
-    - list files, dynamically select files matching a pattern
+    - list files (recursively or the in the current directory only), 
+      dynamically select files matching a pattern
     - open files
     - preview files
     - rename/move files
@@ -27,6 +28,23 @@ Features:
     - copy files
     - delete files
     - show file info
+
+Advanced uses:
+
+Related files: If you set |g:tselectfiles_filter_rx| to some appropriate 
+value, only files matching that regexp will be shown initially. This can 
+be used to restrict the list to "related" files. (The initial filter can 
+be removed by pressing <c-bs>.) See also |tselectfiles#BaseFilter()| and 
+|g:tselectfiles_part_subst|.
+
+Rolodex: If a filename matches an entry in 
+|g:tselectfiles_filedescription_rx| (a dictionnary patter => funcref), 
+funcref(filename) will be called to retrieve the file's description. 
+This function could be used to extract metadata or selected lines from 
+the file etc. By mapping one record onto one file, you would get some 
+sort of rolodex-like database. See 
+|tselectfiles#FormatVikiMetaDataOrFirstLine()| for an example for 
+viki/deplate (vimscript #861) formatted files.
 
 
 -----------------------------------------------------------------------
@@ -53,6 +71,8 @@ Contents~
         g:tselectfiles_use_cache ............ |g:tselectfiles_use_cache|
         g:tselectfiles_no_cache_rx .......... |g:tselectfiles_no_cache_rx|
         g:tselectfiles_filter_rx ............ |g:tselectfiles_filter_rx|
+        g:tselectfiles_part_subst ........... |g:tselectfiles_part_subst|
+        g:tselectfiles_part_subst_ruby ...... |g:tselectfiles_part_subst_ruby|
         g:tselectfiles_limit ................ |g:tselectfiles_limit|
         g:tselectfiles_filedescription_rx ... |g:tselectfiles_filedescription_rx|
         g:tselectfiles_world ................ |g:tselectfiles_world|
@@ -79,6 +99,15 @@ g:tselectfiles_no_cache_rx     (default: '')
                                                     *g:tselectfiles_filter_rx*
 g:tselectfiles_filter_rx       (default: '')
     Retain only files matching this rx. (per window, per buffer, global)
+
+                                                    *g:tselectfiles_part_subst*
+g:tselectfiles_part_subst      (default: {})
+    In |tselectfiles#BaseFilter()|, rewrite name parts according to these 
+    rules.
+
+                                                    *g:tselectfiles_part_subst_ruby*
+g:tselectfiles_part_subst_ruby (default: {'s$': '', '^\(controller\|test\|spec\)$': ''})
+    Poor man's singularize etc.
 
                                                     *g:tselectfiles_limit*
 g:tselectfiles_limit           (default: 0)
