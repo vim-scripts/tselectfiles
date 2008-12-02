@@ -3,8 +3,8 @@
 " @Website:     http://www.vim.org/account/profile.php?user_id=4037
 " @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 " @Created:     2007-10-15.
-" @Last Change: 2008-10-16.
-" @Revision:    0.0.197
+" @Last Change: 2008-11-30.
+" @Revision:    0.0.216
 
 if &cp || exists("loaded_tselectfiles_autoload")
     finish
@@ -213,7 +213,7 @@ function! tselectfiles#ViewFile(world, selected) "{{{3
         call a:world.RestoreOrigin()
         return a:world
     else
-        call a:world.SetOrigin()
+        " call a:world.SetOrigin()
         return tlib#agent#ViewFile(a:world, a:selected)
     endif
 endf
@@ -336,7 +336,7 @@ function! tselectfiles#FormatFirstLine(filename) "{{{3
         let lines = readfile(a:filename)
         for l in lines
             if !empty(l)
-                return printf('%-20s %s', fnamemodify(a:filename, ':t'), l)
+                return printf('%-20s %s', fnamemodify(a:filename, ':t') .'::', l)
             endif
         endfor
     endif
@@ -345,6 +345,7 @@ endf
 
 
 function! tselectfiles#FormatVikiMetaDataOrFirstLine(filename) "{{{3
+    " TLogVAR a:filename
     if filereadable(a:filename)
         let lines = readfile(a:filename)
         let acc   = []
@@ -363,9 +364,16 @@ function! tselectfiles#FormatVikiMetaDataOrFirstLine(filename) "{{{3
                 break
             endif
         endfor
-        return printf('%-20s %s', fnamemodify(a:filename, ':t'), join(acc, ' | '))
+        return printf('%-20s %s', fnamemodify(a:filename, ':t') .'::', join(acc, ' | '))
     endif
     return a:filename
+endf
+
+
+function! tselectfiles#Highlight(world) "{{{3
+    if a:world.display_as_filenames
+        call a:world.Highlight_filename()
+    endif
 endf
 
 
@@ -392,7 +400,8 @@ endf
 
 
 function! tselectfiles#FormatFilter(world, filename) "{{{3
-    let mode = tlib#var#Get('tselectfiles_filter_basename', 'bg', 0)
+    let mode = a:world.tselectfiles_filter_basename
+    " TLogVAR mode
     if mode
         return fnamemodify(a:filename, ':t')
     else
@@ -420,6 +429,8 @@ function! tselectfiles#SelectFiles(mode, dir)
     let world.state_handlers = [
                 \ {'state': '\<reset\>', 'exec': 'call tselectfiles#GetFileList(world, '. string(a:mode) .', 1)'},
                 \ ]
+    let world.tselectfiles_filter_basename = tlib#var#Get('tselectfiles_filter_basename', 'bg', 0)
+    " TLogVAR world.tselectfiles_filter_basename
     if a:mode =~ '^n'
         let s:select_files_pattern = {'mode': 'n', 'pattern': ['*']}
         call s:InstallDirHandler(world)
@@ -443,7 +454,7 @@ function! tselectfiles#SelectFiles(mode, dir)
         call world.SetInitialFilter(filter)
     endif
     let world.display_as_filenames = 1
-    let world.tlib_UseInputListScratch = 'if world.display_as_filenames | call world.Highlight_filename() | endif'
+    let world.tlib_UseInputListScratch = 'call tselectfiles#Highlight(world)'
     let fs = tlib#input#ListW(world)
     call s:ClosePreview()
 endf

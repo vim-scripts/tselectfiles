@@ -3,18 +3,18 @@
 " @Website:     http://www.vim.org/account/profile.php?user_id=4037
 " @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 " @Created:     2007-04-16.
-" @Last Change: 2008-10-16.
-" @Revision:    544
+" @Last Change: 2008-11-25.
+" @Revision:    551
 " GetLatestVimScripts: 1865 1 tselectfiles.vim
 
 if &cp || exists("loaded_tselectfile")
     finish
 endif
-if !exists('loaded_tlib') || loaded_tlib < 18
-    echoerr "tlib >= 0.18 is required"
+if !exists('loaded_tlib') || loaded_tlib < 28
+    echoerr "tlib >= 0.28 is required"
     finish
 endif
-let loaded_tselectfile = 7
+let loaded_tselectfile = 8
 
 " Whether to cache directory listings (in memory). (per buffer, global)
 " If 0, disable the use of cached file listings all together.
@@ -40,13 +40,16 @@ TLet g:tselectfiles_limit = 0
 " file (DEFAULT: the filename).
 TLet g:tselectfiles_filedescription_rx = {}
 
+" Apply filters to basename only.
+TLet g:tselectfiles_filter_basename = 0
+
 " Use these dirs (a comma separated list, see |globpath()|). (per window, per buffer, global)
 " TLet g:tselectfiles_dir = ''
 
 TLet g:tselectfiles_world = {
             \ 'type': 'm',
             \ 'query': 'Select files',
-            \ 'scratch': '__ttoc__',
+            \ 'scratch': '__tselectfiles__',
             \ 'return_agent': 'tselectfiles#ViewFile',
             \ 'display_format': 'tselectfiles#FormatEntry(world, %s)',
             \ 'filter_format': 'tselectfiles#FormatFilter(world, %s)',
@@ -71,7 +74,6 @@ TLet g:tselectfiles_world = {
             \ ],
             \ }
             " \ 'scratch_vertical': (&lines > &co),
-                \ ]
 
 TLet g:tselectfiles_suffixes = printf('\(%s\)\$', join(map(split(&suffixes, ','), 'v:val'), '\|'))
 
@@ -189,4 +191,7 @@ rx in the current buffer's filename.
 0.7
 - NEW: g:tselectfiles_part_subst* variables.
 - NEW: [bg]:tselectfiles_filter_basename variable
+
+0.8
+- Require tlib 0.28
 

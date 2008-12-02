@@ -75,6 +75,7 @@ Contents~
         g:tselectfiles_part_subst_ruby ...... |g:tselectfiles_part_subst_ruby|
         g:tselectfiles_limit ................ |g:tselectfiles_limit|
         g:tselectfiles_filedescription_rx ... |g:tselectfiles_filedescription_rx|
+        g:tselectfiles_filter_basename ...... |g:tselectfiles_filter_basename|
         g:tselectfiles_world ................ |g:tselectfiles_world|
         g:tselectfiles_suffixes ............. |g:tselectfiles_suffixes|
         g:tselectfiles_hidden_rx ............ |g:tselectfiles_hidden_rx|
@@ -117,6 +118,10 @@ g:tselectfiles_limit           (default: 0)
 g:tselectfiles_filedescription_rx (default: {})
     A dictionary of REGEXP => FUNCREF(filename) -> String describing the 
     file (DEFAULT: the filename).
+
+                                                    *g:tselectfiles_filter_basename*
+g:tselectfiles_filter_basename (default: 0)
+    Apply filters to basename only.
 
                                                     *g:tselectfiles_world*
 g:tselectfiles_world           (default: {)
