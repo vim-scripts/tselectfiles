@@ -3,15 +3,15 @@
 " @Website:     http://www.vim.org/account/profile.php?user_id=4037
 " @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 " @Created:     2007-04-16.
-" @Last Change: 2008-11-25.
-" @Revision:    551
+" @Last Change: 2009-02-07.
+" @Revision:    587
 " GetLatestVimScripts: 1865 1 tselectfiles.vim
 
 if &cp || exists("loaded_tselectfile")
     finish
 endif
-if !exists('loaded_tlib') || loaded_tlib < 28
-    echoerr "tlib >= 0.28 is required"
+if !exists('loaded_tlib') || loaded_tlib < 29
+    echoerr "tlib >= 0.29 is required"
     finish
 endif
 let loaded_tselectfile = 8
@@ -24,7 +24,9 @@ TLet g:tselectfiles_use_cache = 1
 " global)
 TLet g:tselectfiles_no_cache_rx = ''
 
-" Retain only files matching this rx. (per window, per buffer, global)
+" Retain only files matching this regexp. (per window, per buffer, global)
+" Regexp |magic| must match the setting of |g:tlib_inputlist_match|.
+" Check: :echo tlib#Filter_{g:tlib_inputlist_match}#New().FilterRxPrefix()
 TLet g:tselectfiles_filter_rx = ''
 
 " In |tselectfiles#BaseFilter()|, rewrite name parts according to these 
@@ -77,9 +79,12 @@ TLet g:tselectfiles_world = {
 
 TLet g:tselectfiles_suffixes = printf('\(%s\)\$', join(map(split(&suffixes, ','), 'v:val'), '\|'))
 
-TLet g:tselectfiles_hidden_rx = '\V\(/.\|/CVS\|/.attic\|.svn\|'. g:tselectfiles_suffixes .'\)\(\[\\/]\|\$\)'
+" Don't include files matching this regexp.
+TLet g:tselectfiles_hidden_rx = '\V\(/.\|/CVS/\|/.attic/\|/.svn/\|/vimfiles\(/\[^/]\+\)\{-}/cache/\|'. tlib#rx#Suffixes('V') .'\)'
+let g:tselectfiles_hidden_rx = substitute(g:tselectfiles_hidden_rx, '/', '\\[\\/]', 'g')
+" TLet g:tselectfiles_skip_rx = tlib#rx#Suffixes('V')
 
-" " TBD: cwindow doesn't currently work as expected
+" " TODO: cwindow doesn't currently work as expected
 " TLet g:tselectfiles_show_quickfix_list = exists(':TRagcw') ? 'TRagcw' : 'cwindow'
 if exists(':TRagcw')
     " The command that is run to show the quickfix list after running grep.
@@ -193,5 +198,14 @@ rx in the current buffer's filename.
 - NEW: [bg]:tselectfiles_filter_basename variable
 
 0.8
-- Require tlib 0.28
+- Require tlib 0.29
+- g:tselectfiles_skip_rx
+
+0.9
+- Don't assume s:select_files_pattern.limit is set
+- Include .* in tselectfiles_hidden_rx
+- FIX: Include .* files (but hide them by default; thanks to 
+naquad/Daniil F.).
+- FIX: If 'splitbelow' is false, opening buffers in split view didn't 
+properly work (thanks to naquad/Daniil F.)
 
