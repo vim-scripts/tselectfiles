@@ -1,10 +1,10 @@
 " tselectfiles.vim
-" @Author:      Thomas Link (mailto:micathom AT gmail com?subject=[vim])
+" @Author:      Tom Link (mailto:micathom AT gmail com?subject=[vim])
 " @Website:     http://www.vim.org/account/profile.php?user_id=4037
 " @License:     GPL (see http://www.gnu.org/licenses/gpl.txt)
 " @Created:     2007-10-15.
-" @Last Change: 2009-02-07.
-" @Revision:    0.0.246
+" @Last Change: 2009-02-15.
+" @Revision:    0.0.293
 
 if &cp || exists("loaded_tselectfiles_autoload")
     finish
@@ -63,6 +63,13 @@ function! s:PrepareSelectFiles(hide)
             endif
         endfor
     endif
+    """ Sort should be case-insensitive if !has('fname_case')
+    " call sort(rv)
+    " for i in range(len(rv) - 1, 0, -1)
+    "     if (has('fname_case') && rv[i] ==# rv[i - 1]) || (!has('fname_case') && rv[i] ==? rv[i - 1])
+    "         call remove(rv, i)
+    "     endif
+    " endfor
     return rv
 endf
 
@@ -422,23 +429,21 @@ function! tselectfiles#FormatFilter(world, filename) "{{{3
 endf
 
 
-function! tselectfiles#SelectFiles(mode, dir)
-    " TLogVAR a:mode, a:dir
+" :display: tselectfiles#SelectFiles(mode, ?dir='', ?pattern='')
+" If dir is empty or "*", the current file's directory is used.
+" If dir is "&", &path is used.
+function! tselectfiles#SelectFiles(mode, ...)
+    TVarArg 'dir', 'pattern'
+    " TLogVAR a:mode, dir, pattern
     let s:select_files_buffer = bufnr('%')
     let s:select_files_mode   = a:mode
-    if empty(a:dir) || a:dir == '*'
+    let s:select_files_prefix = tlib#var#Get('tselectfiles_prefix', 'bg')
+    if empty(dir) || dir == '*'
         let s:select_files_dir = tlib#var#Get('tselectfiles_dir', 'bg', escape(expand('%:p:h'), ','))
-        let s:select_files_prefix = tlib#var#Get('tselectfiles_prefix', 'bg')
-        let filter = [['']]
-        let filter_rx = tlib#var#Get('tselectfiles_filter_rx', 'bg')
-        if !empty(filter_rx)
-            call add(filter, [filter_rx])
-        endif
-        " TLogVAR filter
+    elseif dir == '&'
+        let s:select_files_dir = &path
     else
-        let s:select_files_dir = escape(fnamemodify(a:dir, ':p:h'), ',')
-        let s:select_files_prefix = ''
-        let filter = ''
+        let s:select_files_dir = escape(fnamemodify(dir, ':p:h'), ',')
     endif
     " call TLogVAR('s:select_files_dir=', s:select_files_dir)
     let world = copy(g:tselectfiles_world)
@@ -466,7 +471,17 @@ function! tselectfiles#SelectFiles(mode, dir)
     endif
     call tselectfiles#GetFileList(world, a:mode)
     let world = tlib#World#New(world)
-    if !empty(filter)
+    let filter = [['']]
+    if !empty(pattern)
+        call add(filter, [tlib#rx#Escape(pattern, world.matcher.FilterRxPrefix())])
+    else
+        let filter_rx = tlib#var#Get('tselectfiles_filter_rx', 'bg')
+        if !empty(filter_rx)
+            call add(filter, [filter_rx])
+        endif
+    endif
+    " TLogVAR filter
+    if !empty(filter) && filter != [['']]
         call world.SetInitialFilter(filter)
     endif
     let world.display_as_filenames = 1
@@ -488,7 +503,7 @@ function! tselectfiles#BaseFilter(...) "{{{3
         let rplc = a:0 >= 2 ? a:2 : ''
         let file = substitute(file, a:1, rplc, 'g')
     endif
-    let parts = split(file, '\A')
+    let parts = split(file, '[[:blank:][:digit:][:punct:][:space:]_]')
     let subst = tlib#var#Get('tselectfiles_part_subst_'. &filetype, 'wbg', tlib#var#Get('tselectfiles_part_subst', 'wbg', {}))
     for [pattern, substitution] in items(subst)
         call map(parts, 'substitute(v:val, pattern, substitution, "g")')
