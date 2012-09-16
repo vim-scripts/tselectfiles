@@ -1,10 +1,10 @@
 *tselectfiles.txt*  A simplicistic files selector/browser (sort of)
                     Author: Tom Link, micathom at gmail com
 
-
 This plugin provides a simple file browser. It is not a full blown 
 explorer but can be nevertheless be useful for quickly selecting a few 
-files or renaming them.
+files or renaming them. If you set |g:tlib_inputlist_match| to "fuzzy", 
+it behaves similar to the FuzzyFinder, command-t, or CtrlP plugins.
 
 As the plugin does some caching in the background, the filelist is only 
 generated once for each path or when called with [!]. In conjuncture 
@@ -31,20 +31,20 @@ Features:
 
 Advanced uses:
 
-Related files: If you set |g:tselectfiles_filter_rx| to some appropriate 
+Related files: If you set |g:tselectfiles#filter_rx| to some appropriate 
 value, only files matching that regexp will be shown initially. This can 
 be used to restrict the list to "related" files. (The initial filter can 
 be removed by pressing <c-bs>.) See also |tselectfiles#BaseFilter()| and 
-|g:tselectfiles_part_subst|.
+|g:tselectfiles#part_subst|.
 
 Rolodex: If a filename matches an entry in 
-|g:tselectfiles_filedescription_rx| (a dictionnary patter => funcref), 
-funcref(filename) will be called to retrieve the file's description. 
-This function could be used to extract metadata or selected lines from 
-the file etc. By mapping one record onto one file, you would get some 
-sort of rolodex-like database. See 
-|tselectfiles#FormatVikiMetaDataOrFirstLine()| for an example for 
-viki/deplate (vimscript #861) formatted files.
+|g:tselectfiles#filedescription_rx| (a dictionnary: pattern => 
+function_format_string with one place-holder %s), funcref(filename) will be 
+called to retrieve the file's description. This function could be used to 
+extract metadata or selected lines from the file etc. By mapping one record 
+onto one file, you would get some sort of rolodex-like database. See 
+|tselectfiles#FormatVikiMetaDataOrFirstLine()| for an example for viki/deplate 
+(vimscript #861) formatted files.
 
 
 -----------------------------------------------------------------------
@@ -67,21 +67,22 @@ Suggested maps (to be set in ~/.vimrc): >
 ========================================================================
 Contents~
 
-        g:tselectfiles_use_cache ..................... |g:tselectfiles_use_cache|
-        g:tselectfiles_no_cache_rx ................... |g:tselectfiles_no_cache_rx|
-        g:tselectfiles_filter_rx ..................... |g:tselectfiles_filter_rx|
-        g:tselectfiles_part_subst .................... |g:tselectfiles_part_subst|
-        g:tselectfiles_part_subst_ruby ............... |g:tselectfiles_part_subst_ruby|
-        g:tselectfiles_limit ......................... |g:tselectfiles_limit|
-        g:tselectfiles_filedescription_rx ............ |g:tselectfiles_filedescription_rx|
-        g:tselectfiles_filter_basename ............... |g:tselectfiles_filter_basename|
-        g:tselectfiles_prefix ........................ |g:tselectfiles_prefix|
-        g:tselectfiles_world ......................... |g:tselectfiles_world|
-        g:tselectfiles_suffixes ...................... |g:tselectfiles_suffixes|
-        g:tselectfiles_hidden_rx ..................... |g:tselectfiles_hidden_rx|
-        g:tselectfiles_show_quickfix_list ............ |g:tselectfiles_show_quickfix_list|
         :TSelectFiles ................................ |:TSelectFiles|
         :TSelectFilesInSubdirs ....................... |:TSelectFilesInSubdirs|
+        g:tselectfiles#use_cache ..................... |g:tselectfiles#use_cache|
+        g:tselectfiles#no_cache_rx ................... |g:tselectfiles#no_cache_rx|
+        g:tselectfiles#filter_rx ..................... |g:tselectfiles#filter_rx|
+        g:tselectfiles#part_subst .................... |g:tselectfiles#part_subst|
+        g:tselectfiles#part_subst_ruby ............... |g:tselectfiles#part_subst_ruby|
+        g:tselectfiles#limit ......................... |g:tselectfiles#limit|
+        g:tselectfiles#filedescription_rx ............ |g:tselectfiles#filedescription_rx|
+        g:tselectfiles#filter_basename ............... |g:tselectfiles#filter_basename|
+        g:tselectfiles#prefix ........................ |g:tselectfiles#prefix|
+        g:tselectfiles#use_vcs ....................... |g:tselectfiles#use_vcs|
+        g:tselectfiles#world ......................... |g:tselectfiles#world|
+        g:tselectfiles#suffixes ...................... |g:tselectfiles#suffixes|
+        g:tselectfiles#hidden_rx ..................... |g:tselectfiles#hidden_rx|
+        g:tselectfiles#show_quickfix_list ............ |g:tselectfiles#show_quickfix_list|
         tselectfiles#GetFileList ..................... |tselectfiles#GetFileList()|
         tselectfiles#AgentPostprocess ................ |tselectfiles#AgentPostprocess()|
         tselectfiles#AgentOpenDir .................... |tselectfiles#AgentOpenDir()|
@@ -107,65 +108,6 @@ Contents~
 ========================================================================
 plugin/tselectfiles.vim~
 
-                                                    *g:tselectfiles_use_cache*
-g:tselectfiles_use_cache       (default: 1)
-    Whether to cache directory listings (in memory). (per buffer, global)
-    If 0, disable the use of cached file listings all together.
-
-                                                    *g:tselectfiles_no_cache_rx*
-g:tselectfiles_no_cache_rx     (default: '')
-    Don't use the cache for directories matching this rx. (per buffer, 
-    global)
-
-                                                    *g:tselectfiles_filter_rx*
-g:tselectfiles_filter_rx       (default: '')
-    Retain only files matching this regexp. (per window, per buffer, global)
-    Regexp |magic| must match the setting of |g:tlib_inputlist_match|.
-    Check: :echo tlib#Filter_{g:tlib_inputlist_match}#New().FilterRxPrefix()
-
-                                                    *g:tselectfiles_part_subst*
-g:tselectfiles_part_subst      (default: {})
-    In |tselectfiles#BaseFilter()|, rewrite name parts according to these 
-    rules.
-
-                                                    *g:tselectfiles_part_subst_ruby*
-g:tselectfiles_part_subst_ruby (default: {'s$': '', '^\(controller\|test\|spec\)$': ''})
-    Poor man's singularize etc.
-
-                                                    *g:tselectfiles_limit*
-g:tselectfiles_limit           (default: 0)
-    The max depth when globbing directories recursively. 0 = no limit.
-
-                                                    *g:tselectfiles_filedescription_rx*
-g:tselectfiles_filedescription_rx (default: {})
-    A dictionary of REGEXP => FUNCREF(filename) -> String describing the 
-    file (DEFAULT: the filename).
-
-                                                    *g:tselectfiles_filter_basename*
-g:tselectfiles_filter_basename (default: 0)
-    Apply filters to basename only.
-
-                                                    *g:tselectfiles_prefix*
-g:tselectfiles_prefix          (default: '')
-    Remove prefix from filenames in list.
-    buffer-local, global
-
-                                                    *g:tselectfiles_world*
-g:tselectfiles_world           (default: {)
-
-                                                    *g:tselectfiles_suffixes*
-g:tselectfiles_suffixes        (default: printf('\(%s\)\$', join(map(split(&suffixes, ','), 'v:val'), '\|')))
-
-                                                    *g:tselectfiles_hidden_rx*
-g:tselectfiles_hidden_rx       (default: '\V\(/.\|/CVS/\|/.attic/\|/.svn/\|/vimfiles\(/\[^/]\+\)\{-}/cache/\|'. tlib#rx#Suffixes('V') .'\)')
-    Don't include files matching this regexp.
-
-                                                    *g:tselectfiles_show_quickfix_list*
-g:tselectfiles_show_quickfix_list (default: 'TRagcw')
-    " TODO: cwindow doesn't currently work as expected
-    TLet g:tselectfiles_show_quickfix_list = exists(':TRagcw') ? 'TRagcw' : 'cwindow'
-    The command that is run to show the quickfix list after running grep.
-
                                                     *:TSelectFiles*
 :TSelectFiles[!] [DIR]
     Open/delete/rename files in the current directory.
@@ -186,6 +128,72 @@ g:tselectfiles_show_quickfix_list (default: 'TRagcw')
 
 ========================================================================
 autoload/tselectfiles.vim~
+
+                                                    *g:tselectfiles#use_cache*
+g:tselectfiles#use_cache       (default: 1)
+    Whether to cache directory listings (in memory). (per buffer, global)
+    If 0, disable the use of cached file listings all together.
+
+                                                    *g:tselectfiles#no_cache_rx*
+g:tselectfiles#no_cache_rx     (default: '')
+    Don't use the cache for directories matching this rx. (per buffer, 
+    global)
+
+                                                    *g:tselectfiles#filter_rx*
+g:tselectfiles#filter_rx       (default: '')
+    Retain only files matching this regexp. (per window, per buffer, global)
+    Regexp |magic| must match the setting of |g:tlib_inputlist_match|.
+    Check: :echo tlib#Filter_{g:tlib_inputlist_match}#New().FilterRxPrefix()
+
+                                                    *g:tselectfiles#part_subst*
+g:tselectfiles#part_subst      (default: {})
+    In |tselectfiles#BaseFilter()|, rewrite name parts according to these 
+    rules.
+
+                                                    *g:tselectfiles#part_subst_ruby*
+g:tselectfiles#part_subst_ruby (default: {'s$': '', '^\(controller\|test\|spec\)$': ''})
+    Poor man's singularize etc.
+
+                                                    *g:tselectfiles#limit*
+g:tselectfiles#limit           (default: 0)
+    The max depth when globbing directories recursively. 0 = no limit.
+
+                                                    *g:tselectfiles#filedescription_rx*
+g:tselectfiles#filedescription_rx (default: {})
+    A dictionary of REGEXP => "FUNCTION(%s)" where FUNCTION is the name of 
+    a function that is used to describe a file -- by default this is the 
+    filename.
+
+                                                    *g:tselectfiles#filter_basename*
+g:tselectfiles#filter_basename (default: 0)
+    Apply filters to basename only.
+
+                                                    *g:tselectfiles#prefix*
+g:tselectfiles#prefix          (default: '')
+    Remove prefix from filenames in list.
+    buffer-local, global
+
+                                                    *g:tselectfiles#use_vcs*
+g:tselectfiles#use_vcs         (default: 1)
+    If true and the current buffer is under a VCS, use all files in that 
+    repository.
+
+                                                    *g:tselectfiles#world*
+g:tselectfiles#world           (default: {)
+
+                                                    *g:tselectfiles#suffixes*
+g:tselectfiles#suffixes        (default: printf('\(%s\)\$', join(map(split(&suffixes, ','), 'v:val'), '\|')))
+
+                                                    *g:tselectfiles#hidden_rx*
+g:tselectfiles#hidden_rx       (default: '\V\(/tags\$\|/CVS/\|/.attic/\|/.svn/\|/\(vimfiles\|.vim\)\(/\[^/]\+\)\{-}/cache/\|'. tlib#rx#Suffixes('V') .'\)')
+    Don't include files matching this regexp.
+    TLet g:tselectfiles#hidden_rx = '\V\(/.\|/CVS/\|/.attic/\|/.svn/\|/\(vimfiles\|.vim\)\(/\[^/]\+\)\{-}/cache/\|'. tlib#rx#Suffixes('V') .'\)'
+
+                                                    *g:tselectfiles#show_quickfix_list*
+g:tselectfiles#show_quickfix_list (default: 'TRagcw')
+    " TODO: cwindow doesn't currently work as expected
+    TLet g:tselectfiles#show_quickfix_list = exists(':TRagcw') ? 'TRagcw' : 'cwindow'
+    The command that is run to show the quickfix list after running grep.
 
                                                     *tselectfiles#GetFileList()*
 tselectfiles#GetFileList(world, mode, ...)
@@ -230,7 +238,7 @@ tselectfiles#AgentHide(world, selected)
 tselectfiles#FormatFirstLine(filename)
 
                                                     *tselectfiles#FormatVikiMetaDataOrFirstLine()*
-tselectfiles#FormatVikiMetaDataOrFirstLine(filename)
+tselectfiles#FormatVikiMetaDataOrFirstLine(filename, ...)
 
                                                     *tselectfiles#Highlight()*
 tselectfiles#Highlight(world)
